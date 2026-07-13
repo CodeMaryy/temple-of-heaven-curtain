@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="An interactive editorial portrait of Beijing's Temple of Heaven.">
   <link rel="icon" href="data:,">
+  <link rel="preload" href="assets/temple-roof-cutout-web.webp" as="image" type="image/webp" fetchpriority="high">
   <title>Temple of Heaven</title>
   <style>
     :root {
@@ -97,6 +98,8 @@
         drop-shadow(34px 38px 18px rgba(46, 37, 31, .19))
         drop-shadow(70px 64px 34px rgba(46, 37, 31, .10));
     }
+
+    .temple picture { display: block; }
 
     .destination {
       position: absolute;
@@ -203,7 +206,12 @@
       <button class="configure" id="configure" type="button" aria-expanded="false" aria-controls="settings">Configure</button>
     </header>
 
-    <div class="temple" id="temple"><img src="assets/temple-roof-cutout-web.png" alt="天坛祈年殿屋顶"></div>
+    <div class="temple" id="temple">
+      <picture>
+        <source srcset="assets/temple-roof-cutout-web.webp" type="image/webp">
+        <img src="assets/temple-roof-cutout-web.png" width="901" height="730" fetchpriority="high" decoding="async" alt="天坛祈年殿屋顶">
+      </picture>
+    </div>
     <div class="destination left"><span>Vietnam</span></div>
     <div class="destination right"><span>Japan</span></div>
 
@@ -238,9 +246,93 @@
       let glyphs = '天坛祈年风调雨顺天地玄黄日月星辰礼乐文明北京春秋山川云海';
       const mouse = { x: -999, y: -999, oldX: -999, oldY: -999, active: false };
       const physics = { strength: .72, radius: 34, friction: .965, gravity: .18 };
+      const sound = {
+        context: null,
+        output: null,
+        lastStrike: [],
+        lastGlobal: 0,
+        voices: 0,
+        scale: [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760]
+      };
       let width = 0;
       let height = 0;
       let dpr = 1;
+
+      function unlockSound() {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!sound.context) {
+          const context = new AudioContext();
+          const output = context.createGain();
+          const compressor = context.createDynamicsCompressor();
+          const delay = context.createDelay(.3);
+          const feedback = context.createGain();
+          const wet = context.createGain();
+
+          output.gain.value = .62;
+          compressor.threshold.value = -18;
+          compressor.ratio.value = 3;
+          delay.delayTime.value = .11;
+          feedback.gain.value = .14;
+          wet.gain.value = .13;
+
+          output.connect(compressor);
+          output.connect(delay);
+          delay.connect(feedback);
+          feedback.connect(delay);
+          delay.connect(wet);
+          wet.connect(compressor);
+          compressor.connect(context.destination);
+          sound.context = context;
+          sound.output = output;
+        }
+        if (sound.context.state === 'suspended') sound.context.resume().catch(() => {});
+      }
+
+      function strikeChain(columnIndex, impact, x) {
+        const context = sound.context;
+        if (!context || context.state !== 'running' || impact < 1.1) return;
+
+        const timestamp = performance.now();
+        if (timestamp - (sound.lastStrike[columnIndex] || 0) < 95) return;
+        if (timestamp - sound.lastGlobal < 28 || sound.voices >= 8) return;
+
+        sound.lastStrike[columnIndex] = timestamp;
+        sound.lastGlobal = timestamp;
+        sound.voices += 1;
+
+        const now = context.currentTime;
+        const frequency = sound.scale[columnIndex % sound.scale.length];
+        const level = .028 + Math.min(impact, 18) / 18 * .075;
+        const duration = .72 + Math.random() * .32;
+        const spatial = context.createStereoPanner ? context.createStereoPanner() : context.createGain();
+        const pan = Math.max(-.9, Math.min(.9, x / width * 2 - 1));
+        if (spatial.pan) spatial.pan.setValueAtTime(pan, now);
+        spatial.connect(sound.output);
+
+        [
+          { ratio: 1, amount: 1, decay: 1 },
+          { ratio: 2.01, amount: .24, decay: .62 },
+          { ratio: 3.96, amount: .1, decay: .38 }
+        ].forEach(partial => {
+          const oscillator = context.createOscillator();
+          const envelope = context.createGain();
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(frequency * partial.ratio, now);
+          oscillator.detune.setValueAtTime((Math.random() - .5) * 8, now);
+          envelope.gain.setValueAtTime(level * partial.amount, now);
+          envelope.gain.exponentialRampToValueAtTime(.0001, now + duration * partial.decay);
+          oscillator.connect(envelope);
+          envelope.connect(spatial);
+          oscillator.start(now);
+          oscillator.stop(now + duration + .05);
+        });
+
+        window.setTimeout(() => {
+          sound.voices = Math.max(0, sound.voices - 1);
+          spatial.disconnect();
+        }, (duration + .15) * 1000);
+      }
 
       function build() {
         chains.length = 0;
@@ -297,15 +389,19 @@
         const moveY = mouse.y - mouse.oldY;
         const speed = Math.hypot(moveX, moveY);
         if (speed < .01 || speed > 80) return;
-        for (const chain of chains) {
+        for (let chainIndex = 0; chainIndex < chains.length; chainIndex += 1) {
+          const chain = chains[chainIndex];
+          let strongestImpact = 0;
           for (let index = 1; index < chain.length; index += 1) {
             const point = chain[index];
             const distance = Math.hypot(point.x - mouse.oldX, point.y - mouse.oldY);
             if (distance >= physics.radius) continue;
             const falloff = 1 - distance / physics.radius;
+            strongestImpact = Math.max(strongestImpact, speed * falloff);
             point.x += moveX * physics.strength * falloff;
             point.y += moveY * physics.strength * falloff;
           }
+          if (strongestImpact > 0) strikeChain(chainIndex, strongestImpact, chain[0].x);
         }
       }
 
@@ -437,6 +533,7 @@
       canvas.addEventListener('pointerenter', enter);
       canvas.addEventListener('pointermove', move);
       canvas.addEventListener('pointerleave', leave);
+      window.addEventListener('pointerdown', unlockSound, { passive: true });
       window.addEventListener('resize', resize);
       resize();
       loadBodyText();

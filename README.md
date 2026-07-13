@@ -24,6 +24,10 @@ Then open `http://127.0.0.1:4173/`.
 Use the Configure panel to tune interaction strength, reach, and inertia, or to
 reset the curtain.
 
+Browsers require one explicit interaction before allowing sound. Click anywhere
+on the page once to enable audio, then move the pointer across the character
+curtain to play its chime tones.
+
 ## Deployment
 
 GitHub Pages serves `index.html` and the `assets/` directory directly from the

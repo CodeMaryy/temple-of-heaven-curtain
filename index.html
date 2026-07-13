@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="An interactive editorial portrait of Beijing's Temple of Heaven.">
+  <link rel="icon" href="data:,">
   <title>Temple of Heaven</title>
   <style>
     :root {
@@ -80,21 +81,11 @@
     .temple {
       position: absolute;
       z-index: 4;
-      top: clamp(38px, 5.5vh, 68px);
-      left: 52%;
-      width: min(620px, 51vw);
-      height: auto;
+      top: clamp(48px, 6vh, 72px);
+      left: 50%;
+      width: min(620px, 62vw);
       transform: translateX(-50%);
-      overflow: visible;
       pointer-events: none;
-      -webkit-mask-image:
-        linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%),
-        linear-gradient(to bottom, transparent 0, #000 7%, #000 94%, transparent 100%);
-      -webkit-mask-composite: source-in;
-      mask-image:
-        linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%),
-        linear-gradient(to bottom, transparent 0, #000 7%, #000 94%, transparent 100%);
-      mask-composite: intersect;
     }
 
     .temple img {
@@ -102,6 +93,9 @@
       height: auto;
       display: block;
       mix-blend-mode: multiply;
+      filter:
+        drop-shadow(34px 38px 18px rgba(46, 37, 31, .19))
+        drop-shadow(70px 64px 34px rgba(46, 37, 31, .10));
     }
 
     .destination {
@@ -188,7 +182,7 @@
     @media (max-width: 720px) {
       .masthead { grid-template-columns: 1fr auto; }
       .nav { display: none; }
-      .temple { top: 66px; left: 50%; width: min(510px, 96vw); }
+      .temple { top: 66px; width: min(520px, 96vw); }
       .destination { top: 24%; transform: scale(.86); }
       .destination.left { left: 16px; }
       .destination.right { right: 16px; }
@@ -201,7 +195,7 @@
 </head>
 <body>
   <main class="artboard" id="artboard">
-    <canvas id="curtain" aria-label="Interactive curtain of Chinese characters beneath the Temple of Heaven"></canvas>
+    <canvas id="curtain" aria-label="天坛屋檐下可交互的中文珠帘"></canvas>
 
     <header class="masthead">
       <div class="brand">CodeMira</div>
@@ -209,7 +203,7 @@
       <button class="configure" id="configure" type="button" aria-expanded="false" aria-controls="settings">Configure</button>
     </header>
 
-    <div class="temple" id="temple"><img src="assets/temple-original-crop.png" alt="Architectural portrait of Beijing's Temple of Heaven"></div>
+    <div class="temple" id="temple"><img src="assets/temple-roof-cutout-web.png" alt="天坛祈年殿屋顶"></div>
     <div class="destination left"><span>Vietnam</span></div>
     <div class="destination right"><span>Japan</span></div>
 
@@ -241,38 +235,44 @@
       const settings = document.getElementById('settings');
       const reset = document.getElementById('reset');
       const chains = [];
-      const glyphs = '天坛祈年风调雨顺天地玄黄日月星辰礼乐文明北京春秋山川云海';
+      let glyphs = '天坛祈年风调雨顺天地玄黄日月星辰礼乐文明北京春秋山川云海';
       const mouse = { x: -999, y: -999, oldX: -999, oldY: -999, active: false };
       const physics = { strength: .72, radius: 34, friction: .965, gravity: .18 };
       let width = 0;
       let height = 0;
       let dpr = 1;
-      let segmentLength = 9.5;
 
       function build() {
         chains.length = 0;
         const narrow = width < 720;
-        const columns = narrow ? 20 : 30;
-        const rows = narrow ? 35 : 39;
-        const curtainWidth = Math.min(width * (narrow ? .64 : .39), narrow ? 430 : 440);
+        const columns = narrow ? 16 : 26;
         const templeRect = temple.getBoundingClientRect();
         const artboardRect = artboard.getBoundingClientRect();
-        const buildingCenter = templeRect.left - artboardRect.left + templeRect.width * .48;
+        const buildingCenter = templeRect.left - artboardRect.left + templeRect.width * .5;
+        const curtainWidth = templeRect.width * .84;
         const left = buildingCenter - curtainWidth / 2;
-        const top = (narrow ? Math.min(height * .42, 330) : Math.min(height * .405, 360)) + (narrow ? 8 : 10);
-        segmentLength = narrow
-          ? Math.min(9.2, (height - top - 48) / (rows - 1))
-          : Math.min(9.5, (height - top - 48) / (rows - 1));
+        const templeTop = templeRect.top - artboardRect.top;
+        const roofScale = templeRect.width / 901;
+        const centerEdge = templeTop + 682 * roofScale;
+        const sideEdge = templeTop + 726 * roofScale;
+        const curtainBottom = height - (narrow ? 42 : 48);
+        const availableHeight = Math.max(120, curtainBottom - sideEdge);
+        const rows = Math.max(18, Math.min(narrow ? 35 : 39, Math.floor(availableHeight / 9.4) + 1));
 
         for (let column = 0; column < columns; column += 1) {
           const x = left + column * curtainWidth / (columns - 1);
+          const normalizedX = Math.abs(column / (columns - 1) * 2 - 1);
+          const top = centerEdge + (sideEdge - centerEdge) * Math.pow(normalizedX, 1.7) - 4;
+          const segmentLength = Math.max(6.4, (curtainBottom - top) / (rows - 1));
+          const readingColumn = columns - 1 - column;
           const chain = [];
           for (let row = 0; row < rows; row += 1) {
             const y = top + row * segmentLength;
             chain.push({
               x, y, oldX: x, oldY: y, anchorX: x, anchorY: y,
               pinned: row === 0,
-              char: glyphs[(column * 7 + row * 3) % glyphs.length],
+              restLength: segmentLength,
+              char: glyphs[(readingColumn * rows + row) % glyphs.length],
               alpha: .36 + ((column + row * 2) % 6) * .055
             });
           }
@@ -335,7 +335,7 @@
               const dx = b.x - a.x;
               const dy = b.y - a.y;
               const distance = Math.max(.0001, Math.hypot(dx, dy));
-              const difference = (distance - segmentLength) / distance;
+              const difference = (distance - b.restLength) / distance;
               if (a.pinned) {
                 b.x -= dx * difference;
                 b.y -= dy * difference;
@@ -411,6 +411,20 @@
         });
       }
 
+      async function loadBodyText() {
+        try {
+          const response = await fetch('assets/tiantan.txt');
+          if (!response.ok) throw new Error(`Unable to load body text: ${response.status}`);
+          const characters = (await response.text()).match(/\p{Script=Han}/gu);
+          if (characters && characters.length) {
+            glyphs = characters.join('');
+            build();
+          }
+        } catch (error) {
+          console.warn(error);
+        }
+      }
+
       configure.addEventListener('click', () => {
         const open = settings.hidden;
         settings.hidden = !open;
@@ -425,6 +439,7 @@
       canvas.addEventListener('pointerleave', leave);
       window.addEventListener('resize', resize);
       resize();
+      loadBodyText();
       frame();
     })();
   </script>

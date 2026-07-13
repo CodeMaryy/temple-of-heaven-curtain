@@ -80,23 +80,27 @@
     .temple {
       position: absolute;
       z-index: 4;
-      top: clamp(48px, 7vh, 86px);
+      top: clamp(38px, 5.5vh, 68px);
       left: 52%;
-      width: min(410px, 38vw);
-      height: min(355px, 43vh);
+      width: min(620px, 51vw);
+      height: auto;
       transform: translateX(-50%);
-      overflow: hidden;
+      overflow: visible;
       pointer-events: none;
-      filter: drop-shadow(58px 50px 28px rgba(46, 37, 31, .2));
-      -webkit-mask-image: linear-gradient(to bottom, #000 0 78%, transparent 100%);
-      mask-image: linear-gradient(to bottom, #000 0 78%, transparent 100%);
+      -webkit-mask-image:
+        linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%),
+        linear-gradient(to bottom, transparent 0, #000 7%, #000 94%, transparent 100%);
+      -webkit-mask-composite: source-in;
+      mask-image:
+        linear-gradient(to right, transparent 0, #000 7%, #000 93%, transparent 100%),
+        linear-gradient(to bottom, transparent 0, #000 7%, #000 94%, transparent 100%);
+      mask-composite: intersect;
     }
 
     .temple img {
       width: 100%;
       height: auto;
       display: block;
-      transform: translateY(-8px);
       mix-blend-mode: multiply;
     }
 
@@ -184,7 +188,7 @@
     @media (max-width: 720px) {
       .masthead { grid-template-columns: 1fr auto; }
       .nav { display: none; }
-      .temple { top: 72px; left: 50%; width: min(390px, 78vw); height: 330px; }
+      .temple { top: 66px; left: 50%; width: min(510px, 96vw); }
       .destination { top: 24%; transform: scale(.86); }
       .destination.left { left: 16px; }
       .destination.right { right: 16px; }
@@ -200,12 +204,12 @@
     <canvas id="curtain" aria-label="Interactive curtain of Chinese characters beneath the Temple of Heaven"></canvas>
 
     <header class="masthead">
-      <div class="brand">Budarina</div>
+      <div class="brand">CodeMira</div>
       <nav class="nav" aria-label="Primary"><a href="#home">Home</a><a href="#temple">Destinations</a><a href="#story">Community</a></nav>
       <button class="configure" id="configure" type="button" aria-expanded="false" aria-controls="settings">Configure</button>
     </header>
 
-    <div class="temple" id="temple"><img src="assets/temple-watercolor.jpg" alt="Watercolor painting of Beijing's Temple of Heaven"></div>
+    <div class="temple" id="temple"><img src="assets/temple-original-crop.png" alt="Architectural portrait of Beijing's Temple of Heaven"></div>
     <div class="destination left"><span>Vietnam</span></div>
     <div class="destination right"><span>Japan</span></div>
 
@@ -232,6 +236,7 @@
       const canvas = document.getElementById('curtain');
       const ctx = canvas.getContext('2d');
       const cursor = document.getElementById('cursor');
+      const temple = document.getElementById('temple');
       const configure = document.getElementById('configure');
       const settings = document.getElementById('settings');
       const reset = document.getElementById('reset');
@@ -247,12 +252,17 @@
       function build() {
         chains.length = 0;
         const narrow = width < 720;
-        const columns = narrow ? 29 : 43;
-        const rows = narrow ? 39 : 44;
-        const curtainWidth = Math.min(width * (narrow ? .74 : .45), 520);
-        const left = width * (narrow ? .5 : .52) - curtainWidth / 2;
-        const top = narrow ? Math.min(height * .42, 330) : Math.min(height * .405, 360);
-        segmentLength = narrow ? Math.min(9.4, (height - top - 34) / rows) : Math.min(10, (height - top - 28) / rows);
+        const columns = narrow ? 20 : 30;
+        const rows = narrow ? 35 : 39;
+        const curtainWidth = Math.min(width * (narrow ? .64 : .39), narrow ? 430 : 440);
+        const templeRect = temple.getBoundingClientRect();
+        const artboardRect = artboard.getBoundingClientRect();
+        const buildingCenter = templeRect.left - artboardRect.left + templeRect.width * .48;
+        const left = buildingCenter - curtainWidth / 2;
+        const top = (narrow ? Math.min(height * .42, 330) : Math.min(height * .405, 360)) + (narrow ? 8 : 10);
+        segmentLength = narrow
+          ? Math.min(9.2, (height - top - 48) / (rows - 1))
+          : Math.min(9.5, (height - top - 48) / (rows - 1));
 
         for (let column = 0; column < columns; column += 1) {
           const x = left + column * curtainWidth / (columns - 1);

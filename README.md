@@ -7,6 +7,8 @@ responds to pointer movement.
 ## Live Site
 
 [Open the Temple of Heaven Curtain](https://codemaryy.github.io/temple-of-heaven-curtain/)
+<img width="3316" height="1756" alt="ScreenShot_2026-07-16_145737_621" src="https://github.com/user-attachments/assets/24710edf-74c3-4d98-a9cb-a2c87a6d2f24" />
+
 
 ## Local Preview
 
